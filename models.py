@@ -1,4 +1,3 @@
-from database import Database
 import csv
 from datetime import datetime
 
@@ -6,81 +5,90 @@ class FinanceManager:
     def __init__(self, db):
         self.db = db
 
-    def add_income(self, source, amount):
-        date = datetime.now().strftime('%Y-%m-%d')
+    def add_income(self, user_id, category_id, amount, description, date=None):
+        date = date or datetime.now()  
         self.db.cursor.execute(
-            'INSERT INTO income (date, source, amount) VALUES (?, ?, ?)',
-            (date, source, amount)
+            'INSERT INTO income (user_id, category_id, amount, description, date) VALUES (?, ?, ?, ?, ?)',
+            (user_id, category_id, amount, description, date)
         )
         self.db.conn.commit()
 
-    def add_expense(self, amount, description, category):
-        date = datetime.now().strftime('%Y-%m-%d')
+    def edit_income(self, income_id, new_amount):
         self.db.cursor.execute(
-            'INSERT INTO expenses (date, amount, description, category) VALUES (?, ?, ?, ?)',
-            (date, amount, description, category)
+            'UPDATE income SET amount = ? WHERE id = ?',
+            (new_amount, income_id)
         )
         self.db.conn.commit()
 
-    def set_budget(self, category, limit_amount):
+    def delete_income(self, income_id):
         self.db.cursor.execute(
-            'INSERT OR REPLACE INTO budgets (category, limit_amount) VALUES (?, ?)',
-            (category, limit_amount)
+            'DELETE FROM income WHERE id = ?',
+            (income_id,)
         )
         self.db.conn.commit()
 
-    def get_expenses_by_category(self, category):
+    def view_income_records(self, user_id, start_date, end_date):
         self.db.cursor.execute(
-            'SELECT * FROM expenses WHERE category = ?', (category,)
+            'SELECT id, category_id, amount, description, date FROM income WHERE user_id = ? AND date BETWEEN ? AND ?',
+            (user_id, start_date, end_date)
         )
         return self.db.cursor.fetchall()
 
-    def export_financial_report(self):
-        with open('financial_report.csv', 'w', newline='') as file:
-            writer = csv.writer(file)
-            writer.writerow(['Type', 'Date', 'Amount', 'Category/Source', 'Description'])
-            
-            # Export income
-            self.db.cursor.execute('SELECT * FROM income')
-            for row in self.db.cursor.fetchall():
-                writer.writerow(['Income', row[1], row[3], row[2], ''])
-            
-            # Export expenses
-            self.db.cursor.execute('SELECT * FROM expenses')
-            for row in self.db.cursor.fetchall():
-                writer.writerow(['Expense', row[1], row[2], row[4], row[3]])
-
-class CourseManager:
-    def __init__(self, db):
-        self.db = db
-
-    def add_instructor(self, name, email):
+    def add_expense(self, user_id, category_id, amount, description, date=None):
+        date = date or datetime.now()  
         self.db.cursor.execute(
-            'INSERT INTO instructors (name, email) VALUES (?, ?)',
-            (name, email)
+            'INSERT INTO expenses (user_id, category_id, amount, description, date) VALUES (?, ?, ?, ?, ?)',
+            (user_id, category_id, amount, description, date)
         )
         self.db.conn.commit()
 
-    def add_course(self, name, instructor_id):
+    def edit_expense(self, expense_id, new_amount):
         self.db.cursor.execute(
-            'INSERT INTO courses (name, instructor_id) VALUES (?, ?)',
-            (name, instructor_id)
+            'UPDATE expenses SET amount = ? WHERE id = ?',
+            (new_amount, expense_id)
         )
         self.db.conn.commit()
 
-    def enroll_student(self, name, email, course_id):
+    def delete_expense(self, expense_id):
         self.db.cursor.execute(
-            'INSERT INTO students (name, email, course_id) VALUES (?, ?, ?)',
-            (name, email, course_id)
+            'DELETE FROM expenses WHERE id = ?',
+            (expense_id,)
         )
         self.db.conn.commit()
 
-    def get_course_enrollment(self, course_id):
+    def view_expenses_by_category(self, user_id, category_id):
+        self.db.cursor.execute(
+            'SELECT id, date, amount, description FROM expenses WHERE user_id = ? AND category_id = ?',
+            (user_id, category_id)
+        )
+        return self.db.cursor.fetchall()
+
+    def view_budget_status(self, user_id):
         self.db.cursor.execute('''
-            SELECT s.name, s.email, c.name as course_name, i.name as instructor_name
-            FROM students s
-            JOIN courses c ON s.course_id = c.id
-            JOIN instructors i ON c.instructor_id = i.id
-            WHERE c.id = ?
-        ''', (course_id,))
+            SELECT b.category_id, b.amount as budget_amount, 
+                   COALESCE(SUM(e.amount), 0) as spent
+            FROM budgets b
+            LEFT JOIN expenses e ON b.category_id = e.category_id AND b.user_id = e.user_id
+            WHERE b.user_id = ?
+            GROUP BY b.category_id
+        ''', (user_id,))
         return self.db.cursor.fetchall()
+    
+    def set_budget(self, user_id, category_id, amount, month, year):
+        self.db.cursor.execute(
+            'INSERT OR REPLACE INTO budgets (user_id, category_id, amount, month, year) VALUES (?, ?, ?, ?, ?)',
+            (user_id, category_id, amount, month, year)
+        )
+        self.db.conn.commit()
+    def export_financial_report(self, user_id):
+        with open(f'{user_id}_financial_report.csv', 'w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(['Type', 'Date', 'Amount', 'Category', 'Description'])
+
+            self.db.cursor.execute('SELECT category_id, date, amount, description FROM income WHERE user_id = ?', (user_id,))
+            for row in self.db.cursor.fetchall():
+                writer.writerow(['Income', row[1], row[2], row[0], row[3]])
+
+            self.db.cursor.execute('SELECT category_id, date, amount, description FROM expenses WHERE user_id = ?', (user_id,))
+            for row in self.db.cursor.fetchall():
+                writer.writerow(['Expense', row[1], row[2], row[0], row[3]])
