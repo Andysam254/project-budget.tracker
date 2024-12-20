@@ -1,5 +1,20 @@
 import csv
 from datetime import datetime
+from sqlalchemy import Column, Integer, String, ForeignKey, Float, Date, create_engine, MetaData
+from sqlalchemy.ext.declarative import declarative_base
+
+Base = declarative_base()
+
+class Income(Base):
+    __tablename__ = 'income'
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    source = Column(String, nullable=False)
+    category = Column(Integer)
+    amount = Column(Float, nullable=False)
+    date = Column(Date, nullable=False)
+    notes = Column(String) 
+
 
 class FinanceManager:
     def __init__(self, db):

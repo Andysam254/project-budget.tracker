@@ -1,5 +1,6 @@
 import sqlite3
 from datetime import datetime
+import csv
 
 class Database:
     def __init__(self):
@@ -19,24 +20,23 @@ class Database:
         try:
             with open('financial_report.csv', 'w', newline='') as file:
                 writer = csv.writer(file)
-                writer.writerow(['Type', 'Date', 'Amount', 'Category', 'Description/Source'])
+                writer.writerow(['Type', 'Date', 'Amount', 'Category', 'Description'])
 
-                # Export income
-                self.cursor.execute('''
-                    SELECT source, date, amount, category FROM Income WHERE user_id = ?
-                ''', (user_id,))
+                self.cursor.execute(
+                    'SELECT date, amount, category, description FROM Income WHERE user_id = ?', (user_id,)
+                )
                 for row in self.cursor.fetchall():
-                    writer.writerow(['Income', row[1], row[2], row[3], row[0]])
+                    writer.writerow(['Income', row[0], row[1], row[2], row[3]])
 
-                self.cursor.execute('''
-                    SELECT category, date, amount, description FROM Expenses WHERE user_id = ?
-                ''', (user_id,))
+                self.cursor.execute(
+                    'SELECT date, amount, category, description FROM Expenses WHERE user_id = ?', (user_id,)
+                )
                 for row in self.cursor.fetchall():
-                    writer.writerow(['Expense', row[1], row[2], row[0], row[3]])
-
-            print("Financial report successfully exported to 'financial_report.csv'.")
+                    writer.writerow(['Expense', row[0], row[1], row[2], row[3]])
+            print("Financial report exported to 'financial_report.csv'.")
         except Exception as e:
             print(f"Error exporting financial report: {e}")
+
     def setup_database(self):
        
         self.cursor.execute('''
